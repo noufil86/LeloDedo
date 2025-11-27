@@ -1,0 +1,308 @@
+@baseUrl = http://localhost:3000
+
+########################################################################
+# MANUAL TOKEN INSERTION (FILL THESE AFTER YOU LOGIN BELOW)
+########################################################################
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIwLCJlbWFpbCI6ImFpc2hhLmFkbWluLnVuaXF1ZUBsZWxvZGVkby50ZXN0Iiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzYzODIxMjA1LCJleHAiOjE3NjM5MDc2MDV9.ab_F-FUxJ7w5gSUlG4nrfaNcMKb3AWDqcAWIspBIkio
+@lender1Token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIyLCJlbWFpbCI6ImJpbGFsLmxlbmRlci51bmlxdWVAbGVsb2RlZG8udGVzdCIsInJvbGUiOiJMRU5ERVIiLCJpYXQiOjE3NjM4MjEyMzksImV4cCI6MTc2MzkwNzYzOX0.aXjeHJRRnHl1psrccOYFja3Nw5f_4FkVp5UQkKVzZeM
+@lender2Token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIzLCJlbWFpbCI6ImNlbGluZS5sZW5kZXIudW5pcXVlQGxlbG9kZWRvLnRlc3QiLCJyb2xlIjoiTEVOREVSIiwiaWF0IjoxNzYzODIxMjkxLCJleHAiOjE3NjM5MDc2OTF9.6xnbUaWPI9wf5VVagBhCP6ldZ7gvz-AHKSct5ayhMpE
+@borrower1Token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjI0LCJlbWFpbCI6ImRhbmlzaC5ib3Jyb3dlci51bmlxdWVAbGVsb2RlZG8udGVzdCIsInJvbGUiOiJCT1JST1dFUiIsImlhdCI6MTc2MzgyMTMzNywiZXhwIjoxNzYzOTA3NzM3fQ.KH8qlYeb46tHWCmdD_VOSMP1YRu1mWQ5ZGgf5_pVUMc
+@borrower2Token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjI1LCJlbWFpbCI6ImVtYWFuLmJvcnJvd2VyLnVuaXF1ZUBsZWxvZGVkby50ZXN0Iiwicm9sZSI6IkJPUlJPV0VSIiwiaWF0IjoxNzYzODIxNDEyLCJleHAiOjE3NjM5MDc4MTJ9.TAq5jQt38tA59usrhxkpJVSgPfHyRGG-LLzF-rdvcc8
+
+# Manually set item IDs if needed during testing
+@item1Id = 4
+@item2Id = 6
+@item3Id = 7
+@req1 = 4
+@req2 = 5
+@req3 = 6
+
+
+########################################################################
+# 1) REGISTER USERS (UNIQUE EMAILS)
+########################################################################
+
+### Register Admin
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Aisha Karim",
+  "email": "aisha.admin.unique@lelodedo.test",
+  "password": "Str0ngPass!23",
+  "phone_number": "+923300000001",
+  "role": "ADMIN"
+}
+
+### Register Lender 1
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Bilal Khan",
+  "email": "bilal.lender.unique@lelodedo.test",
+  "password": "Lend3rPass!2025",
+  "phone_number": "+923300000002",
+  "role": "LENDER"
+}
+
+### Register Lender 2
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Celine Raza",
+  "email": "celine.lender.unique@lelodedo.test",
+  "password": "C3lineSecure!2025",
+  "phone_number": "+923300000003",
+  "role": "LENDER"
+}
+
+### Register Borrower 1
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Danish Ahmed",
+  "email": "danish.borrower.unique@lelodedo.test",
+  "password": "Borrower123!!",
+  "phone_number": "+923300000004",
+  "role": "BORROWER"
+}
+
+### Register Borrower 2
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Emaan Tariq",
+  "email": "emaan.borrower.unique@lelodedo.test",
+  "password": "EmaanPass@2025",
+  "phone_number": "+923300000005",
+  "role": "BORROWER"
+}
+
+
+########################################################################
+# 2) LOGIN — COPY TOKENS MANUALLY INTO THE VARIABLES AT TOP
+########################################################################
+
+### Login Admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "aisha.admin.unique@lelodedo.test",
+  "password": "Str0ngPass!23"
+}
+
+### Login Lender 1
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bilal.lender.unique@lelodedo.test",
+  "password": "Lend3rPass!2025"
+}
+
+### Login Lender 2
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "celine.lender.unique@lelodedo.test",
+  "password": "C3lineSecure!2025"
+}
+
+### Login Borrower 1
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "danish.borrower.unique@lelodedo.test",
+  "password": "Borrower123!!"
+}
+
+### Login Borrower 2
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "emaan.borrower.unique@lelodedo.test",
+  "password": "EmaanPass@2025"
+}
+
+
+########################################################################
+# 3) ADMIN CREATES TOOL CATEGORIES
+########################################################################
+
+### Create Power Tools
+POST {{baseUrl}}/tool-category
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "category_name": "Power",
+  "description": "Heavy-duty drills, grinders, saws"
+}
+
+### Create Garden Tools
+POST {{baseUrl}}/tool-category
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "category_name": "Garden Tools",
+  "description": "Shovels, pruners, cutters"
+}
+
+### Create Hand Tools
+POST {{baseUrl}}/tool-category
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "category_name": "Hand Tools",
+  "description": "Hammers and screwdrivers"
+}
+
+### Get All Categories
+GET {{baseUrl}}/tool-category
+
+
+########################################################################
+# 4) LENDER CREATES ITEMS
+########################################################################
+
+### Lender1: Create Item1
+POST {{baseUrl}}/item
+Content-Type: application/json
+Authorization: Bearer {{lender1Token}}
+
+{
+  "title": "Makita Cordless Drill XFD07",
+  "description": "18V brushless drill",
+  "image_url": "makita_drill.jpg",
+  "category_id": 1
+}
+
+### Lender1: Create Item2
+POST {{baseUrl}}/item
+Content-Type: application/json
+Authorization: Bearer {{lender1Token}}
+
+{
+  "title": "Bosch Angle Grinder",
+  "description": "Compact 750W grinder",
+  "image_url": "bosch_grinder.jpg",
+  "category_id": 1
+}
+
+### Lender2: Create Item3
+POST {{baseUrl}}/item
+Content-Type: application/json
+Authorization: Bearer {{lender2Token}}
+
+{
+  "title": "Stihl Leaf Blower BG 56",
+  "description": "Battery leaf blower",
+  "image_url": "stihl_blower.jpg",
+  "category_id": 1
+}
+
+### Get All Items
+GET {{baseUrl}}/item
+
+
+########################################################################
+# 5) MAIN BORROW FLOW (Request → Approve → Return → Confirm)
+########################################################################
+
+### Borrower1 requests item1
+POST {{baseUrl}}/borrow-request
+Content-Type: application/json
+Authorization: Bearer {{borrower1Token}}
+
+{
+  "item_id": {{item1Id}},
+  "duration_days": 3
+}
+
+### Borrower1: sent requests
+GET {{baseUrl}}/borrow-request/sent
+Authorization: Bearer {{borrower1Token}}
+
+### Lender1: incoming
+GET {{baseUrl}}/borrow-request/incoming
+Authorization: Bearer {{lender1Token}}
+
+### Lender1 approves req1
+PATCH {{baseUrl}}/borrow-request/{{req3}}/approve
+Authorization: Bearer {{lender1Token}}
+
+### Check item1 status → should be UNAVAILABLE
+GET {{baseUrl}}/item/{{item1Id}}
+
+### Borrower1 requests return
+PATCH {{baseUrl}}/borrow-request/{{req1}}/return-request
+Authorization: Bearer {{borrower1Token}}
+
+### Lender1 confirms return
+PATCH {{baseUrl}}/borrow-request/{{req1}}/confirm-return
+Authorization: Bearer {{lender1Token}}
+
+### Check item1 → AVAILABLE
+GET {{baseUrl}}/item/{{item1Id}}
+
+
+########################################################################
+# 6) ADVANCED NEGATIVE TESTS + PROTECTION LOGIC
+########################################################################
+
+### Non-admin tries creating category
+POST {{baseUrl}}/tool-category
+Content-Type: application/json
+Authorization: Bearer {{lender1Token}}
+
+{
+  "category_name": "Invalid Category",
+  "description": "Should fail"
+}
+
+### Borrower trying to update item (should fail)
+PATCH {{baseUrl}}/item/{{item1Id}}
+Content-Type: application/json
+Authorization: Bearer {{borrower1Token}}
+
+{
+  "title": "Illegal Update"
+}
+
+### Duplicate request (should fail)
+POST {{baseUrl}}/borrow-request
+Content-Type: application/json
+Authorization: Bearer {{borrower1Token}}
+
+{
+  "item_id": {{item1Id}},
+  "duration_days": 2
+}
+
+### Borrower requests item2, then lender tries deleting (should fail)
+POST {{baseUrl}}/borrow-request
+Content-Type: application/json
+Authorization: Bearer {{borrower1Token}}
+
+{
+  "item_id": {{item2Id}},
+  "duration_days": 2
+}
+
+### Lender tries to delete item2 (should fail)
+DELETE {{baseUrl}}/item/{{item2Id}}
+Authorization: Bearer {{lender1Token}}
+
+########################################################################
+# DONE — Clean, error-free, manual-token REST file.
+########################################################################

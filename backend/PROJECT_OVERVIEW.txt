@@ -1,0 +1,861 @@
+================================================================================
+LELODEDO - TOOL BORROWING PLATFORM - PROJECT OVERVIEW
+================================================================================
+Generated: November 27, 2025
+Status: ~38% Complete
+Stack: NestJS 11 + TypeORM + PostgreSQL + Socket.IO
+
+================================================================================
+1. PROJECT PURPOSE
+================================================================================
+
+Lelodedo is a peer-to-peer tool borrowing platform that allows users to:
+- Share tools/equipment they own with other users
+- Request to borrow items from other users
+- Communicate securely through messaging
+- Rate and review borrowing experiences
+- Track borrowing requests and history
+- Manage their lending activity
+
+The platform facilitates equipment sharing in communities to reduce waste
+and increase resource utilization.
+
+================================================================================
+2. CORE ARCHITECTURE
+================================================================================
+
+2.1 DATABASE LAYER
+-------------------
+Database: PostgreSQL (localhost:5432)
+ORM: TypeORM v0.3.27
+Auto-sync: Enabled (synchronize: true)
+
+Connection Details (from .env or defaults):
+- Host: localhost
+- Port: 5432
+- Username: postgres
+- Password: 1234
+- Database: lelodedo
+
+2.2 API LAYER
+-------------------
+Framework: NestJS v11.0.1
+Runtime: Node.js
+Port: 3000 (default)
+Authentication: JWT + Passport
+Real-time: Socket.IO v4
+
+2.3 PROJECT STRUCTURE
+-------------------
+src/
+├── auth/               # Authentication & JWT
+├── user/              # User profiles & account management
+├── item/              # Tool/item listings
+├── tool-category/     # Item categorization
+├── borrow-request/    # Borrowing request flow
+├── message/           # Messaging & conversations
+├── rating/            # Ratings & reviews
+├── admin/             # Admin operations & analytics
+├── common/            # Shared middleware (rate limiting)
+├── main.ts            # Entry point
+└── app.module.ts      # Root module
+
+================================================================================
+3. CORE ENTITIES & DATA MODELS
+================================================================================
+
+3.1 USER ENTITY
+---------------
+Fields:
+  - user_id (PK): Auto-incremented ID
+  - name: User's display name
+  - email: Unique email address
+  - password_hash: Bcrypted password
+  - phone_number: Optional contact phone
+  - verified_status: Boolean - account verification
+  - suspension_reason: Optional suspension reason
+  - role: ENUM (BORROWER, LENDER, ADMIN)
+  - average_rating: Decimal(3,2) - user reputation score
+  - warning_count: Int - moderation warnings (auto-ban at 3)
+  - ban_reason: Optional - reason for ban
+  - ban_until: Timestamp - ban expiration date
+  - password_reset_token: SHA256 hashed reset token
+  - password_reset_expires: Token expiration (30 mins)
+
+Relationships:
+  - OneToMany: items (owned tools)
+
+3.2 ITEM ENTITY
+---------------
+Fields:
+  - item_id (PK): Auto-incremented ID
+  - title: Item name/title
+  - description: Detailed description
+  - image_url: Primary image URL
+  - image_urls: Array of image URLs (max 5)
+  - availability_status: ENUM (AVAILABLE, UNAVAILABLE, REMOVED)
+
+Relationships:
+  - ManyToOne: owner (User)
+  - ManyToOne: category (ToolCategory)
+
+3.3 TOOL-CATEGORY ENTITY
+------------------------
+Fields:
+  - category_id (PK): Auto-incremented ID
+  - category_name: Unique category name (e.g., "Power Tools")
+  - description: Category description
+
+3.4 BORROW-REQUEST ENTITY
+--------------------------
+Fields:
+  - request_id (PK): Auto-incremented ID
+  - request_date: Timestamp - when request was created
+  - start_date: Date - when borrowing starts
+  - end_date: Date - when borrowing should end
+  - status: ENUM (PENDING, APPROVED, DECLINED, RETURN_REQUESTED, COMPLETED)
+  - extension_requested: Boolean - extension pending flag
+  - extension_requested_until: Date - new end date if extended
+  - extension_requested_at: Timestamp - when extension was requested
+
+Relationships:
+  - ManyToOne: borrower (User)
+  - ManyToOne: lender (User)
+  - ManyToOne: item (Item)
+
+3.5 CONVERSATION ENTITY
+------------------------
+Fields:
+  - conversation_id (PK): Auto-incremented ID
+  - last_message_text: Quick access to latest message
+  - last_message_at: Timestamp of latest message
+  - created_at: Conversation creation timestamp
+  - updated_at: Last activity timestamp
+  - Unique constraint: One conversation per borrow request
+
+Relationships:
+  - OneToOne: borrow_request (BorrowRequest) - cascade delete
+  - ManyToOne: borrower (User)
+  - ManyToOne: lender (User)
+  - OneToMany: messages (Message)
+
+3.6 MESSAGE ENTITY
+-------------------
+Fields:
+  - message_id (PK): Auto-incremented ID
+  - text: Message content (text type for long messages)
+  - read: Boolean - read status
+  - read_at: Timestamp - when message was read
+  - created_at: Message timestamp
+
+Relationships:
+  - ManyToOne: conversation (Conversation) - cascade delete
+  - ManyToOne: sender (User)
+
+3.7 CONVERSATION-USER-READ ENTITY
+----------------------------------
+Fields:
+  - id (PK): Auto-incremented ID
+  - last_seen_at: Timestamp - last time user viewed conversation
+  - is_typing: Boolean - typing indicator status
+  - created_at: Record creation timestamp
+  - updated_at: Last update timestamp
+  - Unique constraint: One record per user per conversation
+
+Relationships:
+  - ManyToOne: conversation (Conversation) - cascade delete
+  - ManyToOne: user (User) - cascade delete
+
+3.8 RATING ENTITY
+------------------
+Fields:
+  - rating_id (PK): Auto-incremented ID
+  - score: Int (1-5) - rating score
+  - review: Text (optional) - review comment
+  - created_at: Timestamp
+  - Unique constraint: Only one rating per user per request
+
+Relationships:
+  - ManyToOne: request (BorrowRequest)
+  - ManyToOne: given_by (User) - who left the rating
+  - ManyToOne: given_to (User) - who received the rating
+
+================================================================================
+4. AUTHENTICATION & SECURITY
+================================================================================
+
+4.1 AUTHENTICATION FLOW
+------------------------
+1. User registers with email, password, name, phone, role
+2. Password hashed with bcrypt (10 rounds)
+3. User logs in with email/password
+4. JWT token generated (24-hour expiration by default)
+5. Token required in Authorization header: "Bearer {token}"
+6. JWT payload contains: user_id, email, role
+
+Security Checks:
+- Ban verification: Users banned after 3 warnings (7 days)
+- Overdue check: Blocked from borrowing if has overdue items
+- Rate limiting: 5 login attempts per 15 minutes per IP
+
+4.2 ROLE-BASED ACCESS CONTROL
+------------------------------
+Roles:
+  - BORROWER: Can request items, borrow, rate
+  - LENDER: Can create items, approve/decline requests, rate
+  - ADMIN: Full platform control, analytics, moderation
+
+Protected Endpoints require @UseGuards(AuthGuard('jwt'))
+Role-restricted endpoints require @Roles('ROLE_NAME')
+
+4.3 MESSAGE SECURITY
+---------------------
+All message endpoints validate:
+- User must be part of conversation (borrower or lender)
+- ForbiddenException thrown if unauthorized
+- Called via validateConversationAccess() method
+
+4.4 PASSWORD RESET
+-------------------
+Flow:
+1. User requests reset at POST /auth/password-reset-request
+2. System generates 32-byte random token, hashes with SHA256
+3. Token stored in DB with 30-minute expiration
+4. User resets password at POST /auth/password-reset with token
+5. Token validated and cleared after successful reset
+
+================================================================================
+5. CORE FEATURES IMPLEMENTED
+================================================================================
+
+5.1 AUTHENTICATION MODULE (100%)
+---------------------------------
+Endpoints:
+  - POST /auth/register
+    Body: { name, email, password, phone_number, role }
+    
+  - POST /auth/login
+    Body: { email, password }
+    Returns: { access_token: "jwt..." }
+    
+  - GET /auth/me (JWT required)
+    Returns: Current user info
+    
+  - POST /auth/password-reset-request
+    Body: { email }
+    Returns: Reset token (30-min expiration)
+    
+  - POST /auth/password-reset
+    Body: { reset_token, new_password }
+
+Implementation:
+  - AuthService: register(), login(), password reset logic
+  - JwtStrategy: JWT validation & payload extraction
+  - RolesGuard: Role-based access control
+
+5.2 USER MODULE (100%)
+-----------------------
+Endpoints:
+  - GET /user/:id/profile
+    Returns: Full user profile with stats
+    Fields: completed_borrows, completed_lends, average_rating, has_overdue
+
+Implementation:
+  - UserService: Profile building with borrow/lend history
+  - Overdue detection: Checks for APPROVED requests with end_date < now
+  - Statistics: Aggregates completed transactions
+
+5.3 ITEM MODULE (100%)
+-----------------------
+Endpoints:
+  - POST /item (JWT required)
+    Body: { title, description, image_url, category_id }
+    Creates item owned by current user
+    
+  - GET /item
+    Lists all available items
+    
+  - GET /item/search/query
+    Query params: title, category_id, availability_status, owner_id, min_rating
+    Returns: Filtered items with owner/category relations
+    
+  - GET /item/:id
+    Returns: Single item with full details
+    
+  - PATCH /item/:id (JWT required, owner only)
+    Updates item details
+    Cannot update if active borrow exists
+    
+  - DELETE /item/:id (JWT required, owner only)
+    Deletes item (only if no active borrows)
+    
+  - POST /item/:id/upload-image (JWT required, owner only)
+    Multipart file upload
+    Max 5MB, JPEG/PNG/WebP/GIF only
+    Stores in /uploads directory
+    Returns: Updated item with image URLs
+
+Implementation:
+  - ItemService: CRUD + search + image management
+  - FileUploadService: Local file storage (disk-based)
+  - Validation: Prevents updates/deletes during active borrows
+
+5.4 CATEGORY MODULE (100%)
+---------------------------
+Endpoints:
+  - POST /tool-category (ADMIN only)
+    Body: { category_name, description }
+    
+  - GET /tool-category
+    Lists all categories
+    
+  - GET /tool-category/:id
+    Single category details
+    
+  - PATCH /tool-category/:id (ADMIN only)
+    Updates category info
+    
+  - DELETE /tool-category/:id (ADMIN only)
+    Hard delete category
+
+Implementation:
+  - ToolCategoryService: Basic CRUD operations
+  - Used for item categorization
+
+5.5 BORROW-REQUEST MODULE (100%)
+---------------------------------
+Core Workflow:
+  1. Borrower creates request (borrower_id auto from JWT)
+  2. Request checked: item exists, available, no overlaps, no overdue
+  3. Lender receives incoming request
+  4. Lender approves/declines
+  5. If approved: item marked UNAVAILABLE
+  6. Borrower requests return when done
+  7. Lender confirms return: item marked AVAILABLE, request COMPLETED
+
+Endpoints:
+  - POST /borrow-request (JWT required)
+    Body: { item_id, duration_days }
+    Auto-calculates start_date (today) + end_date (today + duration)
+    
+  - GET /borrow-request/sent (JWT required)
+    Returns: All requests created by current user (as borrower)
+    
+  - GET /borrow-request/incoming (JWT required)
+    Returns: All requests for items owned by current user (as lender)
+    
+  - PATCH /borrow-request/:id/approve (JWT required, lender only)
+    Approves request, sets status=APPROVED, marks item UNAVAILABLE
+    
+  - PATCH /borrow-request/:id/decline (JWT required, lender only)
+    Declines request, sets status=DECLINED
+    
+  - PATCH /borrow-request/:id/cancel (JWT required, borrower only)
+    Cancels PENDING request only
+    
+  - PATCH /borrow-request/:id/return-request (JWT required, borrower only)
+    Borrower signals return, sets status=RETURN_REQUESTED
+    
+  - PATCH /borrow-request/:id/confirm-return (JWT required, lender only)
+    Lender confirms return, sets status=COMPLETED, marks item AVAILABLE
+    
+  - POST /borrow-request/:id/extend-request (JWT required, borrower only)
+    Body: { extension_days }
+    Sets extension_requested=true, stores new_end_date
+    
+  - PATCH /borrow-request/:id/extend-approve (JWT required, lender only)
+    Approves extension, updates end_date
+    
+  - PATCH /borrow-request/:id/extend-decline (JWT required, lender only)
+    Rejects extension request
+
+Validation:
+  - Borrower cannot request own items
+  - Item must be AVAILABLE
+  - Cannot have overlapping active requests
+  - Cannot borrow if has overdue items
+  - Extension: 1-30 days only
+  - Only APPROVED requests can request extension
+
+Scheduled Task:
+  - @Cron(EVERY_MINUTE): Auto-completes APPROVED requests past end_date
+
+5.6 MESSAGE MODULE (100%)
+--------------------------
+Architecture:
+  - One Conversation per BorrowRequest (1:1)
+  - Multiple Messages per Conversation
+  - Per-user reading tracking via ConversationUserRead
+
+REST Endpoints:
+  - POST /message/send (JWT required)
+    Body: { borrow_request_id, content }
+    Auto-creates conversation if needed
+    
+  - GET /message/inbox (JWT required)
+    Returns: All conversations (sorted by last activity DESC)
+    
+  - GET /message/:conversationId/history (JWT required)
+    Query params: limit (default 50), page (default 0)
+    Returns: Message history with security validation
+    Auto-updates last_seen_at
+    
+  - POST /message/mark-read (JWT required)
+    Body: { conversation_id, message_ids (optional) }
+    Marks messages as read with timestamp
+    
+  - GET /message/:conversationId/unread-count (JWT required)
+    Returns: { unread_count }
+    Counts unread messages in conversation
+    
+  - GET /message/:conversationId/last-seen (JWT required)
+    Returns: { last_seen_at }
+    Last time current user viewed conversation
+
+WebSocket Events (Socket.IO):
+  - send_message: { conversation_id, sender_id, text }
+    Real-time message broadcast to both users
+    
+  - mark_read: { conversation_id, user_id }
+    Read receipt notification
+    
+  - user_typing: { conversation_id, user_id, username }
+    Typing indicator broadcast
+    
+  - user_stopped_typing: { conversation_id, user_id }
+    Clear typing indicator
+    
+  - join_conversation: { conversation_id, user_id }
+    User joins conversation room, updates last_seen
+    
+  - leave_conversation: { conversation_id, user_id }
+    User leaves conversation, clears typing status
+
+Security:
+  - All endpoints validate user is part of conversation
+  - ForbiddenException if not borrower or lender
+  - Messages only readable by parties to conversation
+
+5.7 RATING MODULE (100%)
+------------------------
+Endpoints:
+  - POST /rating/:requestId (JWT required)
+    Body: { score (1-5), review (optional) }
+    Validates: Request COMPLETED, only borrower/lender can rate
+    
+  - GET /rating/user/:userId
+    Returns: All ratings for user (given_to)
+    
+  - GET /rating/user/:userId/average
+    Returns: Average rating score
+
+Validation:
+  - Only one rating per (request, given_by) pair
+  - Can only rate COMPLETED requests
+  - Only borrower or lender can rate
+  - Score: 1-5 range only
+
+Logic:
+  - Auto-updates user.average_rating after each rating
+  - Duplicate prevention via @Unique(['request', 'given_by'])
+
+5.8 ADMIN MODULE (100%)
+------------------------
+User Management (ADMIN only):
+  - GET /admin/users
+    Returns: All users
+    
+  - GET /admin/users/:id
+    Single user details
+    
+  - PATCH /admin/users/:id/role
+    Body: { role }
+    Changes user role
+    
+  - PATCH /admin/users/:id/suspend
+    Body: { reason }
+    Suspends user account
+    
+  - PATCH /admin/users/:id/unsuspend
+    Removes suspension
+    
+  - PATCH /admin/users/:id/warn
+    Body: { reason }
+    Increments warning_count, auto-bans at 3
+    
+  - PATCH /admin/users/:id/ban
+    Body: { duration_days, reason }
+    Bans user for specified duration
+    
+  - PATCH /admin/users/:id/unban
+    Removes ban immediately
+    
+  - DELETE /admin/users/:id
+    Deletes user permanently
+    
+  - GET /admin/search/users
+    Query: name, email, role, warning_count, banned
+    Returns: Filtered user list
+
+System Analytics (ADMIN only):
+  - GET /admin/stats
+    Returns: User counts, item counts, active borrows, overdue count
+    
+  - GET /admin/analytics/top-borrowed-items?limit=10
+    Returns: Most borrowed items with counts
+    
+  - GET /admin/analytics/active-lenders?limit=10
+    Returns: Top lenders with ratings and borrow counts
+    
+  - GET /admin/analytics/overdue-rate
+    Returns: Overdue percentage metrics
+    
+  - GET /admin/analytics/daily-signups?days=30
+    Returns: User signup trend over days
+    
+  - GET /admin/analytics/by-category
+    Returns: Borrow activity by category
+    
+  - GET /admin/analytics/success-rate
+    Returns: Borrow completion percentage
+    
+  - GET /admin/analytics/avg-borrow-duration
+    Returns: Average duration of completed borrows
+    
+  - GET /admin/analytics/active-borrowers?limit=10
+    Returns: Top borrowers with activity
+    
+  - GET /admin/analytics/user-growth
+    Returns: User counts by role with percentages
+    
+  - GET /admin/analytics/item-availability
+    Returns: Item status distribution
+
+Messaging Audit (ADMIN only):
+  - GET /admin/conversations
+    All conversations with messages
+    
+  - GET /admin/conversations/:id
+    Single conversation details
+    
+  - GET /admin/borrow-request/:borrowRequestId/conversation
+    Conversation for specific request
+    
+  - GET /admin/users/:borrowerId/conversations/:lenderId
+    Messages between two specific users
+    
+  - GET /admin/users/:userId/conversations
+    All conversations for specific user
+
+================================================================================
+6. ADVANCED FEATURES
+================================================================================
+
+6.1 SEARCH & FILTER
+--------------------
+Item Search:
+  GET /item/search/query
+  Filters:
+    - title: ILIKE pattern matching
+    - category_id: Exact match
+    - availability_status: AVAILABLE/UNAVAILABLE/REMOVED
+    - owner_id: Filter by owner
+    - min_rating: Filter by owner's rating
+
+Admin User Search:
+  GET /admin/search/users
+  Filters:
+    - name: ILIKE pattern
+    - email: ILIKE pattern
+    - role: BORROWER/LENDER/ADMIN
+    - warning_count: >= threshold
+    - banned: true/false (checks ban_until > now)
+
+6.2 FILE UPLOAD (LOCAL STORAGE)
+-------------------------------
+System:
+  - POST /item/:id/upload-image
+  - Multipart file upload (max 5MB)
+  - Allowed types: JPEG, PNG, WebP, GIF
+  - Stored locally in /uploads directory
+  - Files served statically at /uploads/filename
+  - Max 5 images per item
+  - Auto-sets first image as primary (image_url)
+
+Storage:
+  - Path: {project_root}/uploads/
+  - Filename: item-{timestamp}-{random}.ext
+  - Auto-creates directory on startup
+  - /uploads excluded from git (.gitignore)
+
+6.3 RATE LIMITING
+-----------------
+Middleware applied to all routes:
+
+Login Rate Limit:
+  - Endpoint: POST /auth/login
+  - Window: 15 minutes
+  - Max: 5 attempts per IP
+  - Response: 429 Too Many Requests
+
+Messaging Rate Limit:
+  - Endpoint: POST /message/send
+  - Window: 1 minute
+  - Max: 20 messages per user
+  - Response: 429 Too Many Requests
+
+6.4 BAN/WARNING SYSTEM
+-----------------------
+User Fields:
+  - warning_count: Tracks moderation warnings
+  - ban_reason: Why user is banned
+  - ban_until: Timestamp when ban expires
+
+Flow:
+  1. Admin issues warning → warning_count++
+  2. At 3 warnings → Auto-ban for 7 days
+  3. Admin can manually ban for custom duration
+  4. During ban: Login blocked with expiration timestamp
+  5. Ban expires automatically (checked on login)
+
+Endpoints:
+  - PATCH /admin/users/:id/warn { reason }
+  - PATCH /admin/users/:id/ban { duration_days, reason }
+  - PATCH /admin/users/:id/unban
+
+6.5 BORROW EXTENSIONS
+----------------------
+Allow borrowers to extend borrow period:
+
+Flow:
+  1. Borrower requests extension: POST /borrow-request/:id/extend-request
+  2. Request stored with new end_date
+  3. Lender approves: PATCH /borrow-request/:id/extend-approve
+     → Updates request.end_date to extension_requested_until
+  4. Or lender declines: PATCH /borrow-request/:id/extend-decline
+     → Clears extension without changing end_date
+
+Validation:
+  - Only APPROVED requests can request
+  - Extension: 1-30 days only
+  - Only borrower can request
+  - Only lender can approve/decline
+
+================================================================================
+7. PROJECT DEPENDENCIES
+================================================================================
+
+Core NestJS:
+  - @nestjs/common: Common utilities
+  - @nestjs/core: Core framework
+  - @nestjs/config: Environment configuration
+  - @nestjs/platform-express: Express adapter
+  - @nestjs/platform-socket.io: WebSocket support
+  - @nestjs/websockets: WebSocket module
+  - @nestjs/schedule: Cron jobs (@Cron decorator)
+
+Database & ORM:
+  - typeorm: ^0.3.27 - SQL ORM
+  - pg: ^8.16.3 - PostgreSQL driver
+
+Authentication:
+  - @nestjs/jwt: ^11.0.1 - JWT handling
+  - @nestjs/passport: ^11.0.5 - Passport integration
+  - passport: ^0.7.0 - Authentication middleware
+  - passport-jwt: ^4.0.1 - JWT strategy
+  - bcrypt: ^6.0.0 - Password hashing
+
+Validation:
+  - class-validator: ^0.14.2 - DTO validation
+  - class-transformer: ^0.5.1 - DTO transformation
+
+Utilities:
+  - rxjs: ^7.8.1 - Reactive programming
+  - reflect-metadata: ^0.2.2 - Decorators support
+
+Real-time:
+  - socket.io: Included with @nestjs/platform-socket.io
+
+Security:
+  - express-rate-limit: Rate limiting middleware
+
+Dev Dependencies:
+  - typescript: ^5.7.3 - TypeScript compiler
+  - ts-jest: ^29.2.5 - Jest + TypeScript
+  - jest: ^30.0.0 - Testing framework
+  - supertest: ^7.0.0 - HTTP testing
+  - eslint: Linting
+  - prettier: Code formatting
+
+================================================================================
+8. DEPLOYMENT & RUNNING
+================================================================================
+
+Installation:
+  npm install
+
+Development:
+  npm run start:dev (with watch mode)
+
+Production Build:
+  npm run build
+
+Production Run:
+  npm run start:prod
+
+Testing:
+  npm run test (unit tests)
+  npm run test:e2e (end-to-end tests)
+  npm run test:cov (coverage report)
+
+Database:
+  - Migrations: Auto-sync (synchronize: true in TypeOrmModule)
+  - No manual migrations needed during development
+
+Environment:
+  Create .env file:
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_USERNAME=postgres
+    DB_PASSWORD=1234
+    DB_NAME=lelodedo
+    JWT_SECRET=your-secret-key
+    JWT_EXPIRES_IN=86400 (24 hours)
+    PORT=3000
+
+================================================================================
+9. COMPLETION STATUS
+================================================================================
+
+COMPLETED FEATURES (~38%):
+  ✅ Authentication (register, login, JWT, password reset)
+  ✅ User profiles & management
+  ✅ Items (CRUD, images, search)
+  ✅ Categories (basic CRUD)
+  ✅ Borrow requests (full workflow)
+  ✅ Messaging (real-time WebSocket + REST)
+  ✅ Ratings & reviews
+  ✅ Admin dashboard (10 analytics endpoints)
+  ✅ Rate limiting (login, messaging)
+  ✅ Ban/warning system
+  ✅ Borrow extensions
+  ✅ File upload (local storage)
+  ✅ Search & filter
+
+PENDING FEATURES (~62%):
+  ⏳ Notifications module
+  ⏳ Soft-delete system for User/Item
+  ⏳ Unit tests (more comprehensive)
+  ⏳ E2E tests (more comprehensive)
+  ⏳ Email integration (password reset, notifications)
+  ⏳ Advanced reporting
+  ⏳ Mobile app
+  ⏳ Payment/dispute system
+  ⏳ Recommendation engine
+  ⏳ Item insurance/deposit system
+
+================================================================================
+10. KEY BUSINESS LOGIC
+================================================================================
+
+Borrow Request Workflow:
+  1. Borrower can't borrow if has overdue items
+  2. Borrower can't request own items
+  3. Item must be AVAILABLE
+  4. No overlapping active requests for same item
+  5. Auto-completes overdue APPROVED requests (@Cron every minute)
+  6. Item marked UNAVAILABLE on approval
+  7. Item marked AVAILABLE on completion
+
+Rating System:
+  - Can only rate COMPLETED requests
+  - Only borrower/lender can rate each other
+  - One rating per (request, given_by) pair
+  - User average_rating auto-updated
+
+Security:
+  - All messages validated for conversation access
+  - Ban check before login
+  - Overdue check before borrowing
+  - Rate limiting on sensitive endpoints
+  - JWT tokens expire after 24 hours
+  - Password reset tokens expire after 30 minutes
+
+Messaging:
+  - Typing indicators real-time via Socket.IO
+  - Last-seen tracking per conversation
+  - Unread message counts
+  - Read receipts with timestamps
+
+Admin Moderation:
+  - Warnings track violations (auto-ban at 3)
+  - Manual bans with custom duration
+  - Suspension vs. banning
+  - Full messaging audit trail
+  - Comprehensive analytics
+
+================================================================================
+11. API RESPONSE PATTERNS
+================================================================================
+
+Success Response (200 OK):
+  {
+    "field": "value",
+    "nested": { "data": "here" }
+  }
+
+Error Response (4xx/5xx):
+  {
+    "statusCode": 400,
+    "message": "Error description",
+    "error": "BadRequest|NotFound|Unauthorized|etc"
+  }
+
+Pagination/Lists:
+  Returns array of entities with relations eager-loaded
+
+Messages with Relations:
+  Automatically includes linked entities (owner, category, borrower, lender)
+
+================================================================================
+12. KEY FILES REFERENCE
+================================================================================
+
+Core:
+  - src/main.ts: Entry point, static file serving
+  - src/app.module.ts: Root module, rate limiting middleware
+  - src/app.controller.ts: Health check endpoint
+
+Auth:
+  - src/auth/auth.service.ts: Login, register, password reset
+  - src/auth/jwt.strategy.ts: JWT validation
+  - src/auth/roles.guard.ts: Role-based access control
+
+User:
+  - src/user/user.service.ts: Profile, ban/warning, password reset
+  - src/user/user.entity.ts: User schema
+
+Items & Categories:
+  - src/item/item.service.ts: CRUD, search, image management
+  - src/item/file-upload.service.ts: Local file storage
+  - src/tool-category/: Category CRUD
+
+Borrowing:
+  - src/borrow-request/borrow-request.service.ts: Full workflow
+  - src/borrow-request/borrow-request.entity.ts: Request schema
+
+Messaging:
+  - src/message/message.service.ts: Message operations, security
+  - src/message/message.gateway.ts: Socket.IO real-time
+  - src/message/conversation-user-read.entity.ts: Per-user tracking
+
+Admin:
+  - src/admin/admin.service.ts: Analytics, moderation
+  - src/admin/admin.controller.ts: All admin endpoints
+
+Security:
+  - src/common/rate-limit.middleware.ts: Rate limiting
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

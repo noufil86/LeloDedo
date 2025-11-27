@@ -1,0 +1,218 @@
+// TEST ENDPOINTS - All Medium/Lower Priority Features
+
+// ========================================
+// SEARCH & FILTER
+// ========================================
+
+// Search items by title and category
+GET /item/search/query?title=drill&category_id=1&availability_status=AVAILABLE&min_rating=4
+
+// Search admin users
+GET /admin/search/users?name=john&role=LENDER&warning_count=1&banned=false
+
+// ========================================
+// CATEGORY ENHANCEMENTS
+// ========================================
+
+// Soft-delete a category (ADMIN)
+PATCH /tool-category/1/soft-delete
+Authorization: Bearer {ADMIN_TOKEN}
+
+// Restore a soft-deleted category (ADMIN)
+PATCH /tool-category/1/restore
+Authorization: Bearer {ADMIN_TOKEN}
+
+// Merge category 2 into category 1 (ADMIN)
+POST /tool-category/2/merge-into/1
+Authorization: Bearer {ADMIN_TOKEN}
+
+// Update category with new fields
+PATCH /tool-category/1
+Authorization: Bearer {ADMIN_TOKEN}
+Content-Type: application/json
+
+{
+  "category_name": "Power Tools Updated",
+  "description": "Heavy-duty tools",
+  "is_active": true,
+  "icon_url": "https://example.com/power-tools-icon.png"
+}
+
+// ========================================
+// BORROW EXTENSIONS
+// ========================================
+
+// Request extension (Borrower) - extend by 5 days
+POST /borrow-request/9/extend-request
+Authorization: Bearer {BORROWER_TOKEN}
+Content-Type: application/json
+
+{
+  "extension_days": 5
+}
+
+// Approve extension (Lender)
+PATCH /borrow-request/9/extend-approve
+Authorization: Bearer {LENDER_TOKEN}
+
+// Decline extension (Lender)
+PATCH /borrow-request/9/extend-decline
+Authorization: Bearer {LENDER_TOKEN}
+
+// ========================================
+// FILE UPLOAD
+// ========================================
+
+// Upload item image (multipart form-data)
+POST /item/5/upload-image
+Authorization: Bearer {USER_TOKEN}
+Content-Type: multipart/form-data
+
+file: [binary image file, max 5MB]
+
+// Response example:
+// {
+//   "item_id": 5,
+//   "title": "Drill",
+//   "image_url": "/uploads/item-1234567890-drill.jpg",
+//   "image_urls": ["/uploads/item-1234567890-drill.jpg"],
+//   ...
+// }
+
+// ========================================
+// RATE LIMITING (Automatic)
+// ========================================
+
+// Login rate limit test - make 6 requests in 15 mins from same IP
+// Response on 6th attempt: 429 Too Many Requests
+// "Too many login attempts, please try again after 15 minutes"
+
+// Message rate limit test - send 21 messages in 1 minute
+// Response on 21st attempt: 429 Too Many Requests
+// "Too many messages, please slow down"
+
+// ========================================
+// PASSWORD RESET
+// ========================================
+
+// Step 1: Request password reset
+POST /auth/password-reset-request
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+
+// Response:
+// {
+//   "message": "If email exists, reset token has been sent",
+//   "reset_token": "abc123def456...",  // Remove in production
+//   "expires_in": "30 minutes"
+// }
+
+// Step 2: Reset password with token
+POST /auth/password-reset
+Content-Type: application/json
+
+{
+  "reset_token": "abc123def456...",
+  "new_password": "NewPassword123!"
+}
+
+// Response:
+// {
+//   "message": "Password reset successfully",
+//   "user_id": 5
+// }
+
+// ========================================
+// ADMIN BAN/WARNING SYSTEM
+// ========================================
+
+// Issue warning to user
+PATCH /admin/users/5/warn
+Authorization: Bearer {ADMIN_TOKEN}
+Content-Type: application/json
+
+{
+  "reason": "Sent abusive messages"
+}
+
+// Ban user for 30 days
+PATCH /admin/users/5/ban
+Authorization: Bearer {ADMIN_TOKEN}
+Content-Type: application/json
+
+{
+  "duration_days": 30,
+  "reason": "Violation of community guidelines"
+}
+
+// Unban user immediately
+PATCH /admin/users/5/unban
+Authorization: Bearer {ADMIN_TOKEN}
+
+// Banned user tries to login (will fail)
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "banneduser@example.com",
+  "password": "password123"
+}
+
+// Response:
+// {
+//   "message": "User is banned. Ban expires at: 2025-12-27T15:30:00.000Z",
+//   "statusCode": 401,
+//   "error": "Unauthorized"
+// }
+
+// ========================================
+// VERIFICATION FLOW
+// ========================================
+
+// 1. Create categories with icons
+POST /tool-category
+Authorization: Bearer {ADMIN_TOKEN}
+{
+  "category_name": "Electric Drills",
+  "description": "Cordless and corded drills",
+  "icon_url": "https://example.com/drill-icon.png"
+}
+
+// 2. Create items
+POST /item
+Authorization: Bearer {LENDER_TOKEN}
+{
+  "title": "Makita 18V Drill",
+  "description": "Professional drill",
+  "category_id": 1
+}
+
+// 3. Upload images
+POST /item/1/upload-image
+Authorization: Bearer {LENDER_TOKEN}
+[Upload file]
+
+// 4. Search for items
+GET /item/search/query?title=drill&category_id=1
+
+// 5. Borrow item
+POST /borrow-request
+Authorization: Bearer {BORROWER_TOKEN}
+{
+  "item_id": 1,
+  "duration_days": 3
+}
+
+// 6. Request extension (if needed)
+POST /borrow-request/1/extend-request
+Authorization: Bearer {BORROWER_TOKEN}
+{
+  "extension_days": 5
+}
+
+// 7. Return & complete
+PATCH /borrow-request/1/return-request
+Authorization: Bearer {BORROWER_TOKEN}
