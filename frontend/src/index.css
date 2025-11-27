@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 210 10% 6%;
+    --foreground: 210 6% 96%;
+
+    --card: 210 10% 8%;
+    --card-foreground: 210 6% 96%;
+
+    --popover: 210 10% 8%;
+    --popover-foreground: 210 6% 96%;
+
+    --primary: 207 100% 50%;
+    --primary-foreground: 210 6% 96%;
+
+    --secondary: 210 10% 12%;
+    --secondary-foreground: 210 6% 96%;
+
+    --muted: 210 10% 15%;
+    --muted-foreground: 210 6% 65%;
+
+    --accent: 195 100% 50%;
+    --accent-foreground: 210 6% 96%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 6% 96%;
+
+    --border: 210 10% 15%;
+    --input: 210 10% 15%;
+    --ring: 207 100% 50%;
+
+    --radius: 1rem;
+
+    --glow: 207 100% 50%;
+    --success: 142 76% 36%;
+    --warning: 38 92% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  .glow-effect {
+    box-shadow: 0 0 20px hsl(var(--glow) / 0.3);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .glow-effect:hover {
+    box-shadow: 0 0 30px hsl(var(--glow) / 0.5);
+  }
+
+  .glass-effect {
+    background: hsl(var(--card) / 0.5);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .nav-link {
+    @apply relative inline-block after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-primary after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
